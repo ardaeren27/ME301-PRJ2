@@ -1,0 +1,143 @@
+%% ME301 - PRJ 2 %%
+% Arda Eren Ceran
+
+clear; clc; close all;
+
+%% Define Lengths and Parameters %%
+L_AB = 70;   % [mm]
+L_AG = 95;   % [mm]
+L_GC = 140;  % [mm]
+L_CD = 50;   % [mm]
+L_BE = 230;  % [mm]
+L_FE = 74;   % [mm]
+h5   = 245;  % [mm]
+
+%% Input Motion (given) %%
+theta_13_deg = 0:1:360;          % [deg] (1 deg increment)
+theta_13     = deg2rad(theta_13_deg);  % [rad]
+
+omega_13 = 2;    % [rad/s]  
+alpha_13 = 0;    % [rad/s^2]
+
+%% -------------------- POSITION ANALYSIS (from Project-1) -------------------- %%
+% LCE-1
+s_23 = sqrt( L_GC^2 + L_CD^2 + 2*L_GC*L_CD.*sin(theta_13) ...
+           + 2*(L_AG - L_AB)*L_CD.*cos(theta_13) + (L_AG - L_AB).^2 );
+
+theta_12 = atan2( (L_GC + L_CD.*sin(theta_13))./s_23, ...
+                  (L_AG - L_AB + L_CD.*cos(theta_13))./s_23 );
+
+% LCE-2 
+B_2 = -2*L_AB - 2*L_BE.*cos(theta_12);
+C_2 =  L_AB^2 + L_BE^2 - L_FE^2 + h5^2 + 2*L_AB*L_BE.*cos(theta_12) ...
+     - 2*h5*L_BE.*sin(theta_12);
+
+delta = B_2.^2 - 4*C_2;
+delta = max(delta, 0);
+
+s_15 = (-B_2 - sqrt(delta))./2;  % sigma = -1 
+
+theta_14 = atan2( (L_BE.*sin(theta_12) - h5)./L_FE, ...
+                  (L_AB - s_15 + L_BE.*cos(theta_12))./L_FE );
+
+%% -------------------- VELOCITY ANALYSIS -------------------- %%
+
+
+epsDen = 1e-12;  % avoid divide-by-zero blowups at singularities
+
+% omega_12 and sdot_23
+omega_12 = (L_CD*omega_13.*cos(theta_13 - theta_12)) ./ max(s_23, epsDen);
+sdot_23  =  L_CD*omega_13.*sin(theta_12 - theta_13);
+
+% omega_14 and sdot_15
+cos_t14 = cos(theta_14);
+cos_t14_safe = cos_t14;
+cos_t14_safe(abs(cos_t14_safe) < epsDen) = NaN;  % singular at cos(theta_14)=0
+
+sdot_15 = (L_BE*omega_12.*sin(theta_14 - theta_12)) ./ cos_t14_safe;  % [mm/s]
+omega_14 = (L_BE*omega_12.*cos(theta_12)) ./ (L_FE*cos_t14_safe);      % [rad/s]
+
+%% -------------------- ACCELERATION ANALYSIS -------------------- %%
+% alpha_12
+alpha_12 = ( L_CD*alpha_13.*cos(theta_13 - theta_12) ...
+           - L_CD*omega_13.*(omega_13 - omega_12).*sin(theta_13 - theta_12) ) ./ max(s_23, epsDen) ...
+         - ( L_CD*omega_13.*sdot_23.*cos(theta_13 - theta_12) ) ./ max(s_23, epsDen).^2;
+
+% sddot_23
+sddot_23 = L_CD*alpha_13.*sin(theta_12 - theta_13) ...
+         + L_CD*omega_13.*(omega_12 - omega_13).*cos(theta_12 - theta_13);
+
+% sddot_15
+sddot_15 = ( L_BE*alpha_12.*sin(theta_14 - theta_12) ...
+           + L_BE*omega_12.*(omega_14 - omega_12).*cos(theta_14 - theta_12) ) ./ cos_t14_safe ...
+         + ( L_BE*omega_12.*omega_14.*tan(theta_14).*sin(theta_14 - theta_12) ) ./ cos_t14_safe;
+
+% alpha_14 
+alpha_14 = ( L_BE*alpha_12.*cos(theta_12) - L_BE*(omega_12.^2).*sin(theta_12) ) ./ (L_FE*cos_t14_safe) ...
+         + ( L_BE*omega_12.*omega_14.*tan(theta_14).*cos(theta_12) ) ./ (L_FE*cos_t14_safe);
+
+%% -------------------- PLOTS -------------------- %%
+% Velocities vs theta_13
+figure;
+tiledlayout(2,2);
+
+nexttile;
+plot(theta_13_deg, sdot_23, 'LineWidth', 1.5);
+grid on;
+xlabel('\theta_{13} (deg)');
+ylabel('\dot{s}_{23} (mm/s)');
+title('\dot{s}_{23} vs \theta_{13}');
+
+nexttile;
+plot(theta_13_deg, omega_12, 'LineWidth', 1.5);
+grid on;
+xlabel('\theta_{13} (deg)');
+ylabel('\omega_{12} (rad/s)');
+title('\omega_{12} vs \theta_{13}');
+
+nexttile;
+plot(theta_13_deg, omega_14, 'LineWidth', 1.5);
+grid on;
+xlabel('\theta_{13} (deg)');
+ylabel('\omega_{14} (rad/s)');
+title('\omega_{14} vs \theta_{13}');
+
+nexttile;
+plot(theta_13_deg, sdot_15, 'LineWidth', 1.5);
+grid on;
+xlabel('\theta_{13} (deg)');
+ylabel('\dot{s}_{15} (mm/s)');
+title('\dot{s}_{15} vs \theta_{13}');
+
+% Accelerations vs theta_13
+figure;
+tiledlayout(2,2);
+
+nexttile;
+plot(theta_13_deg, sddot_23, 'LineWidth', 1.5);
+grid on;
+xlabel('\theta_{13} (deg)');
+ylabel('\ddot{s}_{23} (mm/s^2)');
+title('\ddot{s}_{23} vs \theta_{13}');
+
+nexttile;
+plot(theta_13_deg, alpha_12, 'LineWidth', 1.5);
+grid on;
+xlabel('\theta_{13} (deg)');
+ylabel('\alpha_{12} (rad/s^2)');
+title('\alpha_{12} vs \theta_{13}');
+
+nexttile;
+plot(theta_13_deg, alpha_14, 'LineWidth', 1.5);
+grid on;
+xlabel('\theta_{13} (deg)');
+ylabel('\alpha_{14} (rad/s^2)');
+title('\alpha_{14} vs \theta_{13}');
+
+nexttile;
+plot(theta_13_deg, sddot_15, 'LineWidth', 1.5);
+grid on;
+xlabel('\theta_{13} (deg)');
+ylabel('\ddot{s}_{15} (mm/s^2)');
+title('\ddot{s}_{15} vs \theta_{13}');
+
